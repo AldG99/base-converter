@@ -1,0 +1,84 @@
+# Makefile for Number Base Converter (GUI Version with Qt5)
+
+CXX = g++
+CXXFLAGS = -std=c++11 -Wall -Wextra -O2
+SRCDIR = src
+OBJDIR = obj_gui
+
+# Qt5 configuration - adjust paths as needed for your system
+QT5_INCLUDES = -I/usr/include/qt5 -I/usr/include/qt5/QtCore -I/usr/include/qt5/QtWidgets -I/usr/include/qt5/QtGui
+QT5_LIBS = -lQt5Core -lQt5Widgets -lQt5Gui
+QT5_CXXFLAGS = $(QT5_INCLUDES) -fPIC
+
+# For macOS with Homebrew Qt5
+ifeq ($(shell uname -s), Darwin)
+    QT5_PREFIX = $(shell brew --prefix qt5 2>/dev/null || echo "/usr/local/opt/qt5")
+    ifneq ($(wildcard $(QT5_PREFIX)),)
+        QT5_INCLUDES = -I$(QT5_PREFIX)/include -I$(QT5_PREFIX)/include/QtCore -I$(QT5_PREFIX)/include/QtWidgets -I$(QT5_PREFIX)/include/QtGui
+        QT5_LIBS = -F$(QT5_PREFIX)/lib -framework QtCore -framework QtWidgets -framework QtGui
+        QT5_CXXFLAGS = $(QT5_INCLUDES) -fPIC
+    endif
+endif
+
+SOURCES = $(SRCDIR)/main_gui.cpp $(SRCDIR)/MainWindow.cpp $(SRCDIR)/NumberConverter.cpp $(SRCDIR)/BaseValidator.cpp $(SRCDIR)/StepByStepExplainer.cpp $(SRCDIR)/ArithmeticCalculator.cpp
+OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
+MOC_SOURCES = $(SRCDIR)/MainWindow.h
+MOC_OBJECTS = $(MOC_SOURCES:$(SRCDIR)/%.h=$(OBJDIR)/moc_%.o)
+TARGET = base_converter_gui
+
+# Try to find Qt5's moc
+MOC = $(shell which moc-qt5 2>/dev/null || which moc 2>/dev/null || echo "moc")
+ifeq ($(shell uname -s), Darwin)
+    ifneq ($(wildcard $(QT5_PREFIX)),)
+        MOC = $(QT5_PREFIX)/bin/moc
+    endif
+endif
+
+.PHONY: all clean install help check-qt5
+
+all: check-qt5 $(TARGET)
+
+check-qt5:
+	@echo "Checking Qt5 installation..."
+	@which $(MOC) > /dev/null 2>&1 || (echo "Error: Qt5 moc not found. Please install Qt5 development packages." && exit 1)
+	@echo "Qt5 MOC found: $(MOC)"
+
+$(TARGET): $(OBJECTS) $(MOC_OBJECTS) | $(OBJDIR)
+	$(CXX) $(OBJECTS) $(MOC_OBJECTS) -o $(TARGET) $(QT5_LIBS)
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp | $(OBJDIR)
+	$(CXX) $(CXXFLAGS) $(QT5_CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/moc_%.o: $(OBJDIR)/moc_%.cpp | $(OBJDIR)
+	$(CXX) $(CXXFLAGS) $(QT5_CXXFLAGS) -c $< -o $@
+
+$(OBJDIR)/moc_%.cpp: $(SRCDIR)/%.h | $(OBJDIR)
+	$(MOC) $< -o $@
+
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+clean:
+	rm -rf $(OBJDIR) $(TARGET)
+
+install: $(TARGET)
+	@echo "Installing GUI version to /usr/local/bin (requires sudo)"
+	sudo cp $(TARGET) /usr/local/bin/
+
+help:
+	@echo "GUI Version Makefile for Number Base Converter"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  all      - Build the GUI application (default)"
+	@echo "  clean    - Remove built files"
+	@echo "  install  - Install to /usr/local/bin"
+	@echo "  help     - Show this help message"
+	@echo "  check-qt5- Check Qt5 installation"
+	@echo ""
+	@echo "Requirements:"
+	@echo "  - Qt5 development libraries"
+	@echo "  - On Ubuntu/Debian: sudo apt-get install qt5-default qtbase5-dev"
+	@echo "  - On macOS with Homebrew: brew install qt5"
+	@echo "  - On Fedora/RHEL: sudo dnf install qt5-qtbase-devel"
+	@echo ""
+	@echo "For console version, use: make -f Makefile"
